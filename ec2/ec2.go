@@ -15,7 +15,7 @@ import (
 	"encoding/hex"
 	"encoding/xml"
 	"fmt"
-	"github.com/crowdmob/goamz/aws"
+	"github.com/abdollar/goamz/aws"
 	"log"
 	"net/http"
 	"net/http/httputil"
@@ -900,6 +900,64 @@ func (ec2 *EC2) RebootInstances(ids ...string) (resp *SimpleResp, err error) {
 	params := makeParams("RebootInstances")
 	addParamsList(params, "InstanceId", ids)
 	resp = &SimpleResp{}
+	err = ec2.query(params, resp)
+	if err != nil {
+		return nil, err
+	}
+	return resp, nil
+}
+
+// ----------------------------------------------------------------------------
+// AMI Management Functions
+
+// CreateImageOptions stores options for AMi image creation
+//
+//
+type CreateImageOptions struct {
+	InstanceId  string
+	Name        string
+	Description string
+	NoReboot    bool
+}
+
+// response to a CreateImage request
+//
+type CreateImageResp struct {
+	RequestId string `xml:"requestId"`
+	ImageId   string `xml:"imageId`
+}
+
+// CreateImage creates an Amazon EBS-backed AMI from an Amazon EBS-backed instance that is either running or stopped.
+//
+// See xxx for more details
+func (ec2 *EC2) CreateImage(options *CreateImageOptions) (resp *CreateImageResp, err error) {
+	params := makeParams("CreateImage")
+	params["InstanceId"] = options.InstanceId
+	params["Name"] = options.Name
+	params["Description"] = options.Description
+	params["NoReboot"] = strconv.FormatBool(options.NoReboot)
+	resp = &CreateImageResp{}
+	err = ec2.query(params, resp)
+	if err != nil {
+		return nil, err
+	}
+	return resp, nil
+}
+
+// response to a DeregisterImage request
+//
+type DeregisterImageResp struct {
+	RequestId string `xml:"requestId"`
+	Return    bool   `xml:"return"`
+}
+
+// DeregiterImage Deregisters the specified AMI.
+// After you deregister an AMI, it can't be used to launch new instances
+// See xxx for more details
+func (ec2 *EC2) DeregisterImage(imageId string) (resp *DeregisterImageResp, err error) {
+	params := makeParams("DeregisterImage")
+	params["ImageId"] = imageId
+	resp = &DeregisterImageResp{}
 	err = ec2.query(params, resp)
 	if err != nil {
 		return nil, err
