@@ -2,7 +2,7 @@ package dynamodb_test
 
 import (
 	"fmt"
-	"github.com/crowdmob/goamz/dynamodb"
+	"github.com/abdollar/goamz/dynamodb"
 	"testing"
 	"time"
 )

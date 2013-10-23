@@ -3,8 +3,8 @@ package dynamodb_test
 import (
 	"flag"
 	"fmt"
-	"github.com/crowdmob/goamz/aws"
-	"github.com/crowdmob/goamz/dynamodb"
+	"github.com/abdollar/goamz/aws"
+	"github.com/abdollar/goamz/dynamodb"
 	"testing"
 )
 
