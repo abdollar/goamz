@@ -2,10 +2,10 @@ language: go
 
 go:
   - 1.1
+  - 1.2
 
-before_install:
-  - sudo apt-get update -qq > apt-get.out 2>&1  || (cat apt-get.out && exit 1)
-  - sudo apt-get install bzr mercurial git -qq > apt-get.out 2>&1 || (cat apt-get.out && exit 1)
+before_script:
+  - FIXED=$(go fmt ./... | wc -l); if [ $FIXED -gt 0 ]; then echo "gofmt - $FIXED file(s) not formatted correctly, please run gofmt to fix this." && exit 1; fi
 
 script:
   - go test -v ./aws/
@@ -16,3 +16,5 @@ script:
   - go test -v ./iam/
   - go test -v ./s3/
   - go test -v ./sqs/
+  - go test -v ./autoscaling/
+  - go test -v ./rds/

@@ -1,6 +1,7 @@
 package dynamodb
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
 	simplejson "github.com/bitly/go-simplejson"
@@ -13,8 +14,8 @@ type Table struct {
 }
 
 type AttributeDefinitionT struct {
-	Name string
-	Type string
+	Name string `json:"AttributeName"`
+	Type string `json:"AttributeType"`
 }
 
 type KeySchemaT struct {
@@ -50,6 +51,54 @@ type TableDescriptionT struct {
 	TableName             string
 	TableSizeBytes        int64
 	TableStatus           string
+}
+
+type describeTableResponse struct {
+	Table TableDescriptionT
+}
+
+func findAttributeDefinitionByName(ads []AttributeDefinitionT, name string) *AttributeDefinitionT {
+	for _, a := range ads {
+		if a.Name == name {
+			return &a
+		}
+	}
+	return nil
+}
+
+func (a *AttributeDefinitionT) GetEmptyAttribute() *Attribute {
+	switch a.Type {
+	case "S":
+		return NewStringAttribute(a.Name, "")
+	case "N":
+		return NewNumericAttribute(a.Name, "")
+	case "B":
+		return NewBinaryAttribute(a.Name, "")
+	default:
+		return nil
+	}
+}
+
+func (t *TableDescriptionT) BuildPrimaryKey() (pk PrimaryKey, err error) {
+	for _, k := range t.KeySchema {
+		var attr *Attribute
+		ad := findAttributeDefinitionByName(t.AttributeDefinitions, k.AttributeName)
+		if ad == nil {
+			return pk, errors.New("An inconsistency found in TableDescriptionT")
+		}
+		attr = ad.GetEmptyAttribute()
+		if attr == nil {
+			return pk, errors.New("An inconsistency found in TableDescriptionT")
+		}
+
+		switch k.KeyType {
+		case "HASH":
+			pk.KeyAttribute = attr
+		case "RANGE":
+			pk.RangeAttribute = attr
+		}
+	}
+	return
 }
 
 func (s *Server) NewTable(name string, key PrimaryKey) *Table {
@@ -105,7 +154,48 @@ func (s *Server) CreateTable(tableDescription TableDescriptionT) (string, error)
 		return "unknown", err
 	}
 
-	return json.Get("TableStatus").MustString(), nil
+	return json.Get("TableDescription").Get("TableStatus").MustString(), nil
+}
+
+func (s *Server) DeleteTable(tableDescription TableDescriptionT) (string, error) {
+	query := NewEmptyQuery()
+	query.AddDeleteRequestTable(tableDescription)
+
+	jsonResponse, err := s.queryServer(target("DeleteTable"), query)
+
+	if err != nil {
+		return "unknown", err
+	}
+
+	json, err := simplejson.NewJson(jsonResponse)
+
+	if err != nil {
+		return "unknown", err
+	}
+
+	return json.Get("TableDescription").Get("TableStatus").MustString(), nil
+}
+
+func (t *Table) DescribeTable() (*TableDescriptionT, error) {
+	return t.Server.DescribeTable(t.Name)
+}
+
+func (s *Server) DescribeTable(name string) (*TableDescriptionT, error) {
+	q := NewEmptyQuery()
+	q.addTableByName(name)
+
+	jsonResponse, err := s.queryServer(target("DescribeTable"), q)
+	if err != nil {
+		return nil, err
+	}
+
+	var r describeTableResponse
+	err = json.Unmarshal(jsonResponse, &r)
+	if err != nil {
+		return nil, err
+	}
+
+	return &r.Table, nil
 }
 
 func keyParam(k *PrimaryKey, hashKey string, rangeKey string) string {

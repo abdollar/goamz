@@ -79,7 +79,7 @@ func (s *S) TestHead(c *gocheck.C) {
 	c.Assert(req.Header["Date"], gocheck.Not(gocheck.Equals), "")
 
 	c.Assert(err, gocheck.IsNil)
-	c.Assert(resp.ContentLength, gocheck.Equals, int64(-1))
+	c.Assert(resp.ContentLength, gocheck.FitsTypeOf, int64(0))
 	c.Assert(resp, gocheck.FitsTypeOf, &http.Response{})
 }
 
@@ -193,6 +193,31 @@ func (s *S) TestPutObject(c *gocheck.C) {
 	c.Assert(req.Header["X-Amz-Acl"], gocheck.DeepEquals, []string{"private"})
 }
 
+func (s *S) TestPutObjectReadTimeout(c *gocheck.C) {
+	s.s3.ReadTimeout = 50 * time.Millisecond
+	defer func() {
+		s.s3.ReadTimeout = 0
+	}()
+
+	b := s.s3.Bucket("bucket")
+	err := b.Put("name", []byte("content"), "content-type", s3.Private, s3.Options{})
+
+	// Make sure that we get a timeout error.
+	c.Assert(err, gocheck.NotNil)
+
+	// Set the response after the request times out so that the next request will work.
+	testServer.Response(200, nil, "")
+
+	// This time set the response within our timeout period so that we expect the call
+	// to return successfully.
+	go func() {
+		time.Sleep(25 * time.Millisecond)
+		testServer.Response(200, nil, "")
+	}()
+	err = b.Put("name", []byte("content"), "content-type", s3.Private, s3.Options{})
+	c.Assert(err, gocheck.IsNil)
+}
+
 func (s *S) TestPutReader(c *gocheck.C) {
 	testServer.Response(200, nil, "")
 
@@ -291,4 +316,46 @@ func (s *S) TestListWithDelimiter(c *gocheck.C) {
 	c.Assert(data.IsTruncated, gocheck.Equals, false)
 	c.Assert(len(data.Contents), gocheck.Equals, 0)
 	c.Assert(data.CommonPrefixes, gocheck.DeepEquals, []string{"photos/2006/feb/", "photos/2006/jan/"})
+}
+
+func (s *S) TestExists(c *gocheck.C) {
+	testServer.Response(200, nil, "")
+
+	b := s.s3.Bucket("bucket")
+	result, err := b.Exists("name")
+
+	req := testServer.WaitRequest()
+
+	c.Assert(req.Method, gocheck.Equals, "HEAD")
+
+	c.Assert(err, gocheck.IsNil)
+	c.Assert(result, gocheck.Equals, true)
+}
+
+func (s *S) TestExistsNotFound404(c *gocheck.C) {
+	testServer.Response(404, nil, "")
+
+	b := s.s3.Bucket("bucket")
+	result, err := b.Exists("name")
+
+	req := testServer.WaitRequest()
+
+	c.Assert(req.Method, gocheck.Equals, "HEAD")
+
+	c.Assert(err, gocheck.IsNil)
+	c.Assert(result, gocheck.Equals, false)
+}
+
+func (s *S) TestExistsNotFound403(c *gocheck.C) {
+	testServer.Response(403, nil, "")
+
+	b := s.s3.Bucket("bucket")
+	result, err := b.Exists("name")
+
+	req := testServer.WaitRequest()
+
+	c.Assert(req.Method, gocheck.Equals, "HEAD")
+
+	c.Assert(err, gocheck.IsNil)
+	c.Assert(result, gocheck.Equals, false)
 }
