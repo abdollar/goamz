@@ -1,4 +1,4 @@
-package autoscaling
+package sts
 
 import (
 	"crypto/hmac"
