@@ -55,7 +55,7 @@ func NewSts(auth aws.Auth, region aws.Region) (*Sts, error) {
 func (sts *Sts) query(params map[string]string, resp interface{}) error {
 	params["Version"] = "2011-06-15"
 	params["Timestamp"] = timeNow().In(time.UTC).Format(time.RFC3339)
-	endpoint, err := url.Parse(sts.Region.STSEndpoint)
+	endpoint, err := url.Parse(sts.Region.STSEndPoint)
 	if err != nil {
 		return err
 	}
