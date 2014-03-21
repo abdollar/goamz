@@ -1,15 +1,19 @@
 package sts
 
 import (
-	"bytes"
 	"encoding/xml"
 	"fmt"
 	"github.com/abdollar/goamz/aws"
-	"io"
 	"net/http"
+	"net/http/httputil"
+	"net/url"
+	"strconv"
+	"time"
 )
 
 const debug = true
+
+var timeNow = time.Now
 
 type Sts struct {
 	aws.Auth
@@ -51,14 +55,14 @@ func NewSts(auth aws.Auth, region aws.Region) (*Sts, error) {
 func (sts *Sts) query(params map[string]string, resp interface{}) error {
 	params["Version"] = "2011-06-15"
 	params["Timestamp"] = timeNow().In(time.UTC).Format(time.RFC3339)
-	endpoint, err := url.Parse(sts.Region.StsEndpoint)
+	endpoint, err := url.Parse(sts.Region.STSEndpoint)
 	if err != nil {
 		return err
 	}
 	sign(sts.Auth, "GET", endpoint.Path, params, endpoint.Host)
 	endpoint.RawQuery = multimap(params).Encode()
 	if debug {
-		log.Printf("get { %v } -> {\n", endpoint.String())
+		fmt.Println("get { %v } -> {\n", endpoint.String())
 	}
 	r, err := http.Get(endpoint.String())
 	if err != nil {
@@ -68,8 +72,8 @@ func (sts *Sts) query(params map[string]string, resp interface{}) error {
 
 	if debug {
 		dump, _ := httputil.DumpResponse(r, true)
-		log.Printf("response:\n")
-		log.Printf("%v\n}\n", string(dump))
+		fmt.Println("response:\n")
+		fmt.Println("%v\n}\n", string(dump))
 	}
 	if r.StatusCode != 200 {
 		return buildError(r)
@@ -129,11 +133,12 @@ type GetFederationTokenResp struct {
 	FederatedUser FederatedUser `xml:"GetFederationTokenResult>FederatedUser"`
 }
 
-func (sts *Sts) GetFederationToken(durationSeconds int) (resp *GetFederationTokenResponse, err error) {
-	resp = &GetFederationTokenResponse{}
+func (sts *Sts) GetFederationToken(durationSeconds int) (resp *GetFederationTokenResp, err error) {
+	resp = &GetFederationTokenResp{}
+	params := make(map[string]string)
 	params["Action"] = "GetFederationToken"
 	params["DurationSeconds"] = strconv.Itoa(durationSeconds)
-	err = as.query(params, resp)
+	err = sts.query(params, resp)
 	if err != nil {
 		return nil, err
 	}
