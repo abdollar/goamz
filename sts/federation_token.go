@@ -133,11 +133,13 @@ type GetFederationTokenResp struct {
 	FederatedUser FederatedUser `xml:"GetFederationTokenResult>FederatedUser"`
 }
 
-func (sts *Sts) GetFederationToken(durationSeconds int) (resp *GetFederationTokenResp, err error) {
+func (sts *Sts) GetFederationToken(durationSeconds int, federatedUserName string, policy string) (resp *GetFederationTokenResp, err error) {
 	resp = &GetFederationTokenResp{}
 	params := make(map[string]string)
 	params["Action"] = "GetFederationToken"
 	params["DurationSeconds"] = strconv.Itoa(durationSeconds)
+	params["Name"] = federatedUserName
+	params["Policy"] = policy
 	err = sts.query(params, resp)
 	if err != nil {
 		return nil, err
